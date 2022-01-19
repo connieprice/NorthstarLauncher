@@ -129,9 +129,6 @@ bool ServerAuthenticationManager::AuthenticatePlayer(void* player, int64_t uid, 
 	std::string strUid = std::to_string(uid);
 	std::lock_guard<std::mutex> guard(m_authDataMutex);
 
-	// set persistent data as ready, we use 0x3 internally to mark the client as using local persistence
-	*((char*)player + 0x4a0) = (char)0x4;
-
 	if (!CVar_ns_auth_allow_insecure->m_nValue) // no auth data and insecure connections aren't allowed, so dc the client
 		return false;
 
@@ -152,6 +149,9 @@ bool ServerAuthenticationManager::AuthenticatePlayer(void* player, int64_t uid, 
 	pdataStream.read((char*)player + 0x4FA, length);
 
 	pdataStream.close();
+
+	// set persistent data as ready, we use 0x3 internally to mark the client as using local persistence
+	*((char*)player + 0x4a0) = (char)0x4;
 
 	return true; // auth successful, client stays on
 }
