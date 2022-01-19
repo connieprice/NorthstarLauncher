@@ -126,6 +126,9 @@ void ServerAuthenticationManager::StopPlayerAuthServer()
 
 bool ServerAuthenticationManager::AuthenticatePlayer(void* player, int64_t uid, char* authToken)
 {
+	spdlog::info("[USER ID PRINT] {}", g_LocalPlayerUserID);
+	spdlog::info("[USER TOKEN PRINT] {}", g_MasterServerManager->m_ownClientAuthToken);
+
 	std::string strUid = std::to_string(uid);
 	std::lock_guard<std::mutex> guard(m_authDataMutex);
 
