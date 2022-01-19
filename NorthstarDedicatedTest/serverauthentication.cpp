@@ -129,57 +129,29 @@ bool ServerAuthenticationManager::AuthenticatePlayer(void* player, int64_t uid, 
 	std::string strUid = std::to_string(uid);
 	std::lock_guard<std::mutex> guard(m_authDataMutex);
 
-	bool authFail = true;
-	if (!m_authData.empty() && m_authData.count(std::string(authToken)))
-	{
-		// use stored auth data
-		AuthData authData = m_authData[authToken];
-		if (!strcmp(strUid.c_str(), authData.uid)) // connecting client's uid is the same as auth's uid
-		{
-			authFail = false;
-			// uuid
-			strcpy((char*)player + 0xF500, strUid.c_str());
+	// set persistent data as ready, we use 0x3 internally to mark the client as using local persistence
+	*((char*)player + 0x4a0) = (char)0x4;
 
-			// copy pdata into buffer
-			memcpy((char*)player + 0x4FA, authData.pdata, authData.pdataSize);
+	if (!CVar_ns_auth_allow_insecure->m_nValue) // no auth data and insecure connections aren't allowed, so dc the client
+		return false;
 
-			// set persistent data as ready, we use 0x4 internally to mark the client as using remote persistence
-			*((char*)player + 0x4a0) = (char)0x4;
-		}
-	}
+	// insecure connections are allowed, try reading from disk
+	// uuid
+	strcpy((char*)player + 0xF500, strUid.c_str());
 
+	// try reading pdata file for player
+	std::string pdataPath = "R2Northstar/placeholder_playerdata.pdata";
+	std::fstream pdataStream(pdataPath, std::ios_base::in);
 
-	if (authFail)
-	{
-		// set persistent data as ready, we use 0x3 internally to mark the client as using local persistence
-		*((char*)player + 0x4a0) = (char)0x3;
+	// get file length
+	pdataStream.seekg(0, pdataStream.end);
+	auto length = pdataStream.tellg();
+	pdataStream.seekg(0, pdataStream.beg);
 
-		if (!CVar_ns_auth_allow_insecure->m_nValue) // no auth data and insecure connections aren't allowed, so dc the client
-			return false;
+	// copy pdata into buffer
+	pdataStream.read((char*)player + 0x4FA, length);
 
-		// insecure connections are allowed, try reading from disk
-		// uuid
-		strcpy((char*)player + 0xF500, strUid.c_str());
-
-		// try reading pdata file for player
-		std::string pdataPath = "R2Northstar/playerdata_";
-		pdataPath += strUid;
-		pdataPath += ".pdata";
-
-		std::fstream pdataStream(pdataPath, std::ios_base::in);
-		if (pdataStream.fail()) // file doesn't exist, use placeholder
-			pdataStream = std::fstream("R2Northstar/placeholder_playerdata.pdata");
-		
-		// get file length
-		pdataStream.seekg(0, pdataStream.end);
-		auto length = pdataStream.tellg();
-		pdataStream.seekg(0, pdataStream.beg);
-
-		// copy pdata into buffer
-		pdataStream.read((char*)player + 0x4FA, length);
-
-		pdataStream.close();
-	}
+	pdataStream.close();
 
 	return true; // auth successful, client stays on
 }
